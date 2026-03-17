@@ -102,7 +102,7 @@ function initEventListeners() {
 
     // 添加分类按钮
     document.getElementById('add-category-btn').addEventListener('click', () => {
-        openModal('category-modal');
+        openCategoryModal();
     });
 
     // 导入按钮
@@ -142,6 +142,9 @@ function initEventListeners() {
     // 分类表单提交
     document.getElementById('category-form').addEventListener('submit', handleCategorySubmit);
 
+    // 删除分类按钮
+    document.getElementById('delete-category-btn').addEventListener('click', handleDeleteCategory);
+
     // 表单Tab切换
     document.querySelectorAll('.form-tab').forEach(tab => {
         tab.addEventListener('click', () => {
@@ -166,28 +169,30 @@ function initEventListeners() {
         document.getElementById('category-color').value = e.target.value;
     });
 
-    // BibTeX 文件选择
-    document.getElementById('select-bibtex-file').addEventListener('click', () => {
-        document.getElementById('bibtex-file').click();
+    // 新的导入文件选择
+    document.getElementById('select-import-file').addEventListener('click', () => {
+        document.getElementById('import-file').click();
     });
 
-    document.getElementById('bibtex-file').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                importBibTeX(event.target.result);
-            };
-            reader.readAsText(file);
-        }
-    });
+    document.getElementById('import-file').addEventListener('change', handleFileSelect);
 
-    // BibTeX 文本导入
-    document.getElementById('import-bibtex-text').addEventListener('click', () => {
-        const text = document.getElementById('bibtex-paste').value;
+    // 粘贴内容导入
+    document.getElementById('import-paste-btn').addEventListener('click', () => {
+        const text = document.getElementById('import-paste').value;
+        const format = document.getElementById('paste-format').value;
         if (text.trim()) {
-            importBibTeX(text);
+            importFromText(text, format);
+        } else {
+            showToast('请输入要导入的内容', 'error');
         }
+    });
+
+    // 导入格式卡片点击
+    document.querySelectorAll('.import-format-card').forEach(card => {
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.import-format-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+        });
     });
 
     // 导出格式按钮
@@ -247,6 +252,20 @@ function renderCategories() {
             <span class="category-dot" style="background: ${cat.color}"></span>
             <span>${cat.name}</span>
             <span class="count">${countByCategory(cat.id)}</span>
+            <div class="category-actions">
+                <span class="category-edit-btn" data-action="edit" title="编辑分类">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    </svg>
+                </span>
+                <span class="category-delete-btn" data-action="delete" title="删除分类">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </span>
+            </div>
         </button>
     `).join('');
 
@@ -256,7 +275,12 @@ function renderCategories() {
 
     // 分类点击事件
     container.querySelectorAll('.category-item').forEach(item => {
-        item.addEventListener('click', () => {
+        // 点击分类名称筛选
+        item.addEventListener('click', (e) => {
+            // 如果点击的是操作按钮，不触发筛选
+            if (e.target.closest('.category-actions')) {
+                return;
+            }
             state.currentCategory = item.dataset.category;
             state.currentView = 'category';
             state.currentTag = null;
@@ -264,6 +288,26 @@ function renderCategories() {
             renderReferences();
             renderCategories();
         });
+
+        // 编辑按钮
+        const editBtn = item.querySelector('.category-edit-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const catId = item.dataset.category;
+                editCategory(catId);
+            });
+        }
+
+        // 删除按钮
+        const deleteBtn = item.querySelector('.category-delete-btn');
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const catId = item.dataset.category;
+                confirmDeleteCategory(catId);
+            });
+        }
     });
 }
 
@@ -677,18 +721,121 @@ function handleReferenceSubmit(e) {
 function handleCategorySubmit(e) {
     e.preventDefault();
     
-    const category = {
-        id: generateId(),
-        name: document.getElementById('category-name').value,
-        color: document.getElementById('category-color').value
-    };
+    const editId = document.getElementById('category-edit-id').value;
+    const name = document.getElementById('category-name').value;
+    const color = document.getElementById('category-color').value;
 
-    state.categories.push(category);
+    if (editId) {
+        // 编辑现有分类
+        const index = state.categories.findIndex(c => c.id === editId);
+        if (index !== -1) {
+            state.categories[index].name = name;
+            state.categories[index].color = color;
+            showToast('分类已更新', 'success');
+        }
+    } else {
+        // 添加新分类
+        const category = {
+            id: generateId(),
+            name: name,
+            color: color
+        };
+        state.categories.push(category);
+        showToast('分类已添加', 'success');
+    }
+
     saveCategories();
     closeAllModals();
     renderCategories();
     document.getElementById('category-form').reset();
-    showToast('分类已添加', 'success');
+}
+
+// 打开分类模态框（新增或编辑）
+function openCategoryModal(categoryId = null) {
+    const modal = document.getElementById('category-modal');
+    const title = document.getElementById('category-modal-title');
+    const editIdInput = document.getElementById('category-edit-id');
+    const deleteBtn = document.getElementById('delete-category-btn');
+    const nameInput = document.getElementById('category-name');
+    const colorInput = document.getElementById('category-color');
+    const colorText = document.getElementById('category-color-text');
+
+    if (categoryId) {
+        // 编辑模式
+        const category = state.categories.find(c => c.id === categoryId);
+        if (category) {
+            title.textContent = '编辑分类';
+            editIdInput.value = categoryId;
+            nameInput.value = category.name;
+            colorInput.value = category.color;
+            colorText.value = category.color;
+            deleteBtn.style.display = 'inline-flex';
+        }
+    } else {
+        // 新增模式
+        title.textContent = '添加分类';
+        editIdInput.value = '';
+        nameInput.value = '';
+        colorInput.value = '#6366f1';
+        colorText.value = '#6366f1';
+        deleteBtn.style.display = 'none';
+    }
+
+    openModal('category-modal');
+}
+
+// 编辑分类
+function editCategory(categoryId) {
+    openCategoryModal(categoryId);
+}
+
+// 确认删除分类
+function confirmDeleteCategory(categoryId) {
+    const category = state.categories.find(c => c.id === categoryId);
+    if (!category) return;
+
+    const refCount = countByCategory(categoryId);
+    let message = `确定要删除分类"${category.name}"吗？`;
+    if (refCount > 0) {
+        message += `\n\n该分类下有 ${refCount} 篇文献，删除后这些文献将变为未分类状态。`;
+    }
+
+    if (confirm(message)) {
+        deleteCategory(categoryId);
+    }
+}
+
+// 删除分类
+function deleteCategory(categoryId) {
+    // 将该分类下的文献设为未分类
+    state.references.forEach(ref => {
+        if (ref.category === categoryId) {
+            ref.category = '';
+        }
+    });
+    saveReferences();
+
+    // 删除分类
+    state.categories = state.categories.filter(c => c.id !== categoryId);
+    saveCategories();
+
+    // 如果当前正在查看该分类，切换到全部
+    if (state.currentCategory === categoryId) {
+        state.currentCategory = null;
+        state.currentView = 'all';
+    }
+
+    closeAllModals();
+    render();
+    showToast('分类已删除', 'success');
+}
+
+// 处理模态框内的删除按钮
+function handleDeleteCategory() {
+    const editId = document.getElementById('category-edit-id').value;
+    if (editId) {
+        confirmDeleteCategory(editId);
+    }
 }
 
 function addTagToInput(tag) {
@@ -954,7 +1101,137 @@ function formatAuthorsGB(authors) {
 // BibTeX 导入/导出
 // ============================================
 
-function importBibTeX(text) {
+// 待导入的文件列表
+let pendingImportFiles = [];
+
+// 处理文件选择
+function handleFileSelect(e) {
+    const files = Array.from(e.target.files);
+    const fileListContainer = document.getElementById('import-file-list');
+    
+    pendingImportFiles = files;
+    
+    fileListContainer.innerHTML = files.map((file, index) => `
+        <div class="import-file-item" data-index="${index}">
+            <span class="file-name">${file.name}</span>
+            <span class="file-size">${formatFileSize(file.size)}</span>
+            <span class="remove-file" data-index="${index}">&times;</span>
+        </div>
+    `).join('');
+
+    // 移除文件按钮
+    fileListContainer.querySelectorAll('.remove-file').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const index = parseInt(e.target.dataset.index);
+            pendingImportFiles.splice(index, 1);
+            handleFileSelect({ target: { files: pendingImportFiles } });
+        });
+    });
+
+    // 如果有文件，立即开始导入
+    if (files.length > 0) {
+        processImportFiles(files);
+    }
+}
+
+// 格式化文件大小
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// 处理导入文件
+async function processImportFiles(files) {
+    let totalImported = 0;
+    let errors = [];
+
+    for (const file of files) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        
+        try {
+            const content = await readFileContent(file);
+            let imported = 0;
+
+            switch (ext) {
+                case 'bib':
+                    imported = importBibTeX(content, false);
+                    break;
+                case 'ris':
+                    imported = importRIS(content, false);
+                    break;
+                case 'xml':
+                    imported = importEndNoteXML(content, false);
+                    break;
+                case 'json':
+                    imported = importJSON(content, false);
+                    break;
+                case 'pdf':
+                    imported = await importPDF(file, false);
+                    break;
+                case 'doc':
+                case 'docx':
+                    imported = await importDOC(file, false);
+                    break;
+                default:
+                    errors.push(`不支持的文件格式: ${file.name}`);
+            }
+            
+            totalImported += imported;
+        } catch (e) {
+            errors.push(`导入失败: ${file.name} - ${e.message}`);
+            console.error(e);
+        }
+    }
+
+    saveReferences();
+    closeAllModals();
+    render();
+
+    if (totalImported > 0) {
+        showToast(`成功导入 ${totalImported} 篇文献`, 'success');
+    }
+    if (errors.length > 0) {
+        showToast(errors.join('\n'), 'error');
+    }
+}
+
+// 读取文件内容
+function readFileContent(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = (e) => reject(new Error('文件读取失败'));
+        reader.readAsText(file);
+    });
+}
+
+// 从粘贴内容导入
+function importFromText(text, format) {
+    let imported = 0;
+    
+    try {
+        switch (format) {
+            case 'bibtex':
+                imported = importBibTeX(text, true);
+                break;
+            case 'ris':
+                imported = importRIS(text, true);
+                break;
+            case 'endnote':
+                imported = importEndNoteXML(text, true);
+                break;
+            default:
+                showToast('不支持的格式', 'error');
+                return;
+        }
+    } catch (e) {
+        showToast('导入失败：' + e.message, 'error');
+        console.error(e);
+    }
+}
+
+function importBibTeX(text, showMessage = true) {
     try {
         const entries = parseBibTeX(text);
         let imported = 0;
@@ -987,14 +1264,343 @@ function importBibTeX(text) {
             imported++;
         });
 
+        if (showMessage) {
+            saveReferences();
+            closeAllModals();
+            render();
+            showToast(`成功导入 ${imported} 篇文献`, 'success');
+        }
+        
+        return imported;
+    } catch (e) {
+        if (showMessage) {
+            showToast('导入失败：BibTeX 格式不正确', 'error');
+        }
+        console.error(e);
+        return 0;
+    }
+}
+
+// 导入 RIS 格式
+function importRIS(text, showMessage = true) {
+    try {
+        const entries = parseRIS(text);
+        let imported = 0;
+
+        entries.forEach(entry => {
+            const ref = {
+                id: generateId(),
+                type: mapRISType(entry.TY) || 'article',
+                title: entry.TI || entry.T1 || '',
+                authors: (entry.AU || []).join('; '),
+                year: parseInt(entry.PY || entry.Y1) || new Date().getFullYear(),
+                journal: entry.JO || entry.JF || entry.T2 || '',
+                volume: entry.VL || '',
+                number: entry.IS || '',
+                pages: entry.SP ? (entry.EP ? `${entry.SP}-${entry.EP}` : entry.SP) : '',
+                doi: entry.DO || '',
+                url: entry.UR || '',
+                abstract: entry.AB || '',
+                keywords: (entry.KW || []).join(', '),
+                tags: [],
+                notes: entry.N1 || '',
+                progress: 0,
+                readingStatus: 'unread',
+                favorite: false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            state.references.push(ref);
+            imported++;
+        });
+
+        if (showMessage) {
+            saveReferences();
+            closeAllModals();
+            render();
+            showToast(`成功导入 ${imported} 篇文献`, 'success');
+        }
+        
+        return imported;
+    } catch (e) {
+        if (showMessage) {
+            showToast('导入失败：RIS 格式不正确', 'error');
+        }
+        console.error(e);
+        return 0;
+    }
+}
+
+// 解析 RIS 格式
+function parseRIS(text) {
+    const entries = [];
+    const lines = text.split('\n');
+    let currentEntry = null;
+    let currentField = null;
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+
+        if (trimmed.startsWith('TY  -')) {
+            if (currentEntry) entries.push(currentEntry);
+            currentEntry = { TY: trimmed.substring(6).trim() };
+            currentField = 'TY';
+        } else if (trimmed.startsWith('ER  -')) {
+            if (currentEntry) entries.push(currentEntry);
+            currentEntry = null;
+        } else if (currentEntry) {
+            const match = trimmed.match(/^([A-Z][A-Z0-9])\s+-\s+(.*)$/);
+            if (match) {
+                const [, tag, value] = match;
+                currentField = tag;
+                if (['AU', 'KW'].includes(tag)) {
+                    if (!currentEntry[tag]) currentEntry[tag] = [];
+                    currentEntry[tag].push(value);
+                } else {
+                    currentEntry[tag] = value;
+                }
+            }
+        }
+    }
+
+    if (currentEntry) entries.push(currentEntry);
+    return entries;
+}
+
+// RIS 类型映射
+function mapRISType(risType) {
+    const typeMap = {
+        'JOUR': 'article',
+        'BOOK': 'book',
+        'CHAP': 'inbook',
+        'CONF': 'inproceedings',
+        'THES': 'thesis',
+        'RPRT': 'techreport',
+        'ELEC': 'misc',
+        'GEN': 'misc'
+    };
+    return typeMap[risType] || 'misc';
+}
+
+// 导入 EndNote XML 格式
+function importEndNoteXML(text, showMessage = true) {
+    try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(text, 'text/xml');
+        const records = doc.querySelectorAll('record');
+        let imported = 0;
+
+        records.forEach(record => {
+            const getField = (selector) => {
+                const el = record.querySelector(selector);
+                return el ? el.textContent.trim() : '';
+            };
+
+            const authors = [];
+            record.querySelectorAll('contributors author').forEach(a => {
+                authors.push(a.textContent.trim());
+            });
+
+            const keywords = [];
+            record.querySelectorAll('keywords keyword').forEach(k => {
+                keywords.push(k.textContent.trim());
+            });
+
+            const ref = {
+                id: generateId(),
+                type: mapEndNoteType(getField('ref-type')),
+                title: getField('titles title'),
+                authors: authors.join('; '),
+                year: parseInt(getField('dates year')) || new Date().getFullYear(),
+                journal: getField('periodical full-title') || getField('secondary-title'),
+                volume: getField('volume'),
+                number: getField('number'),
+                pages: getField('pages'),
+                doi: getField('electronic-resource-num'),
+                url: getField('urls related-urls url'),
+                abstract: getField('abstract'),
+                keywords: keywords.join(', '),
+                tags: [],
+                notes: getField('notes'),
+                progress: 0,
+                readingStatus: 'unread',
+                favorite: false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (ref.title) {
+                state.references.push(ref);
+                imported++;
+            }
+        });
+
+        if (showMessage) {
+            saveReferences();
+            closeAllModals();
+            render();
+            showToast(`成功导入 ${imported} 篇文献`, 'success');
+        }
+
+        return imported;
+    } catch (e) {
+        if (showMessage) {
+            showToast('导入失败：EndNote XML 格式不正确', 'error');
+        }
+        console.error(e);
+        return 0;
+    }
+}
+
+// EndNote 类型映射
+function mapEndNoteType(endnoteType) {
+    const typeMap = {
+        '17': 'article',
+        '6': 'book',
+        '5': 'inbook',
+        '10': 'inproceedings',
+        '32': 'thesis',
+        '27': 'techreport'
+    };
+    return typeMap[endnoteType] || 'misc';
+}
+
+// 导入 JSON 格式
+function importJSON(text, showMessage = true) {
+    try {
+        const data = JSON.parse(text);
+        const entries = Array.isArray(data) ? data : [data];
+        let imported = 0;
+
+        entries.forEach(entry => {
+            const ref = {
+                id: generateId(),
+                type: entry.type || 'article',
+                title: entry.title || '',
+                authors: entry.authors || entry.author || '',
+                year: parseInt(entry.year) || new Date().getFullYear(),
+                journal: entry.journal || '',
+                volume: entry.volume || '',
+                number: entry.number || '',
+                pages: entry.pages || '',
+                doi: entry.doi || '',
+                url: entry.url || '',
+                abstract: entry.abstract || '',
+                keywords: entry.keywords || '',
+                tags: entry.tags || [],
+                notes: entry.notes || '',
+                progress: entry.progress || 0,
+                readingStatus: entry.readingStatus || 'unread',
+                favorite: entry.favorite || false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+
+            if (ref.title) {
+                state.references.push(ref);
+                imported++;
+            }
+        });
+
+        if (showMessage) {
+            saveReferences();
+            closeAllModals();
+            render();
+            showToast(`成功导入 ${imported} 篇文献`, 'success');
+        }
+
+        return imported;
+    } catch (e) {
+        if (showMessage) {
+            showToast('导入失败：JSON 格式不正确', 'error');
+        }
+        console.error(e);
+        return 0;
+    }
+}
+
+// 导入 PDF（提取基本信息）
+async function importPDF(file, showMessage = true) {
+    // 由于浏览器环境限制，无法完整解析 PDF
+    // 这里创建一个基于文件名的占位记录
+    const fileName = file.name.replace('.pdf', '');
+    
+    const ref = {
+        id: generateId(),
+        type: 'article',
+        title: fileName,
+        authors: '',
+        year: new Date().getFullYear(),
+        journal: '',
+        volume: '',
+        number: '',
+        pages: '',
+        doi: '',
+        url: '',
+        abstract: '',
+        keywords: '',
+        tags: [],
+        notes: `从 PDF 文件导入: ${file.name}\n\n请手动补充文献详细信息。`,
+        progress: 0,
+        readingStatus: 'unread',
+        favorite: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sourceFile: file.name
+    };
+
+    state.references.push(ref);
+
+    if (showMessage) {
         saveReferences();
         closeAllModals();
         render();
-        showToast(`成功导入 ${imported} 篇文献`, 'success');
-    } catch (e) {
-        showToast('导入失败：BibTeX 格式不正确', 'error');
-        console.error(e);
+        showToast('PDF 文献已导入，请手动补充详细信息', 'info');
     }
+
+    return 1;
+}
+
+// 导入 DOC/DOCX（提取基本信息）
+async function importDOC(file, showMessage = true) {
+    const fileName = file.name.replace(/\.(doc|docx)$/i, '');
+    
+    const ref = {
+        id: generateId(),
+        type: 'misc',
+        title: fileName,
+        authors: '',
+        year: new Date().getFullYear(),
+        journal: '',
+        volume: '',
+        number: '',
+        pages: '',
+        doi: '',
+        url: '',
+        abstract: '',
+        keywords: '',
+        tags: [],
+        notes: `从 Word 文档导入: ${file.name}\n\n请手动补充文献详细信息。`,
+        progress: 0,
+        readingStatus: 'unread',
+        favorite: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sourceFile: file.name
+    };
+
+    state.references.push(ref);
+
+    if (showMessage) {
+        saveReferences();
+        closeAllModals();
+        render();
+        showToast('Word 文档已导入，请手动补充详细信息', 'info');
+    }
+
+    return 1;
 }
 
 function parseBibTeX(text) {

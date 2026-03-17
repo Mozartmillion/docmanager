@@ -298,11 +298,11 @@
         </div>
     </div>
 
-    <!-- 添加分类模态框 -->
+    <!-- 添加/编辑分类模态框 -->
     <div class="modal" id="category-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>添加分类</h2>
+                <h2 id="category-modal-title">添加分类</h2>
                 <button class="icon-btn modal-close">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -311,6 +311,7 @@
                 </button>
             </div>
             <form id="category-form">
+                <input type="hidden" id="category-edit-id">
                 <div class="form-group">
                     <label for="category-name">分类名称 *</label>
                     <input type="text" id="category-name" required>
@@ -323,8 +324,17 @@
                     </div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary modal-close">取消</button>
-                    <button type="submit" class="btn btn-primary">保存</button>
+                    <button type="button" class="btn btn-danger" id="delete-category-btn" style="display:none;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                        删除分类
+                    </button>
+                    <div class="form-actions-right">
+                        <button type="button" class="btn btn-secondary modal-close">取消</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -332,7 +342,7 @@
 
     <!-- 导入模态框 -->
     <div class="modal" id="import-modal">
-        <div class="modal-content">
+        <div class="modal-content modal-large">
             <div class="modal-header">
                 <h2>导入文献</h2>
                 <button class="icon-btn modal-close">
@@ -343,17 +353,82 @@
                 </button>
             </div>
             <div class="import-options">
-                <div class="import-option">
-                    <h4>从BibTeX文件导入</h4>
-                    <p>支持 .bib 格式文件</p>
-                    <input type="file" id="bibtex-file" accept=".bib" style="display:none">
-                    <button class="btn btn-secondary" id="select-bibtex-file">选择文件</button>
+                <!-- 文件导入区 -->
+                <div class="import-section">
+                    <h4>📁 从文件导入</h4>
+                    <p class="import-hint">支持多种主流格式，可一次选择多个文件</p>
+                    <div class="import-formats-grid">
+                        <div class="import-format-card" data-format="bibtex">
+                            <div class="format-icon">📚</div>
+                            <div class="format-name">BibTeX</div>
+                            <div class="format-ext">.bib</div>
+                        </div>
+                        <div class="import-format-card" data-format="ris">
+                            <div class="format-icon">📋</div>
+                            <div class="format-name">RIS</div>
+                            <div class="format-ext">.ris</div>
+                        </div>
+                        <div class="import-format-card" data-format="endnote">
+                            <div class="format-icon">📝</div>
+                            <div class="format-name">EndNote XML</div>
+                            <div class="format-ext">.xml</div>
+                        </div>
+                        <div class="import-format-card" data-format="pdf">
+                            <div class="format-icon">📄</div>
+                            <div class="format-name">PDF</div>
+                            <div class="format-ext">.pdf</div>
+                        </div>
+                        <div class="import-format-card" data-format="doc">
+                            <div class="format-icon">📃</div>
+                            <div class="format-name">Word</div>
+                            <div class="format-ext">.doc/.docx</div>
+                        </div>
+                        <div class="import-format-card" data-format="json">
+                            <div class="format-icon">🔧</div>
+                            <div class="format-name">JSON</div>
+                            <div class="format-ext">.json</div>
+                        </div>
+                    </div>
+                    <input type="file" id="import-file" accept=".bib,.ris,.xml,.pdf,.doc,.docx,.json" style="display:none" multiple>
+                    <button class="btn btn-secondary btn-full" id="select-import-file">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        选择文件
+                    </button>
+                    <div class="import-file-list" id="import-file-list"></div>
                 </div>
+
                 <div class="import-divider">或</div>
-                <div class="import-option">
-                    <h4>粘贴BibTeX内容</h4>
-                    <textarea id="bibtex-paste" rows="8" placeholder="粘贴BibTeX格式的文献信息..."></textarea>
-                    <button class="btn btn-primary" id="import-bibtex-text">导入</button>
+
+                <!-- 粘贴导入区 -->
+                <div class="import-section">
+                    <h4>📋 粘贴内容导入</h4>
+                    <div class="form-group">
+                        <label for="paste-format">内容格式</label>
+                        <select id="paste-format">
+                            <option value="bibtex">BibTeX</option>
+                            <option value="ris">RIS</option>
+                            <option value="endnote">EndNote XML</option>
+                        </select>
+                    </div>
+                    <textarea id="import-paste" rows="6" placeholder="粘贴文献信息内容..."></textarea>
+                    <button class="btn btn-primary" id="import-paste-btn">导入</button>
+                </div>
+
+                <!-- 存储说明 -->
+                <div class="import-storage-info">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                    <div class="storage-info-text">
+                        <strong>文献数据存储位置：</strong>
+                        <p>所有文献元数据保存在浏览器本地存储（LocalStorage）中。PDF 等附件文件以 Base64 形式存储，请注意浏览器存储空间限制（约 5-10MB）。如需长期保存，建议定期导出备份。</p>
+                    </div>
                 </div>
             </div>
         </div>
