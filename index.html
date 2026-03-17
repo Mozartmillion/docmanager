@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文献管理助手 - RefManager</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+            <div class="logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                <span>RefManager</span>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-view="all">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                    全部文献
+                    <span class="count" id="total-count">0</span>
+                </button>
+                <button class="nav-item" data-view="reading">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+                        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+                    </svg>
+                    正在阅读
+                    <span class="count" id="reading-count">0</span>
+                </button>
+                <button class="nav-item" data-view="completed">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    已完成
+                    <span class="count" id="completed-count">0</span>
+                </button>
+                <button class="nav-item" data-view="favorites">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    收藏
+                    <span class="count" id="favorites-count">0</span>
+                </button>
+            </nav>
+
+            <div class="categories-section">
+                <div class="section-header">
+                    <h3>分类</h3>
+                    <button class="icon-btn" id="add-category-btn" title="添加分类">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="categories-list" id="categories-list">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <div class="tags-section">
+                <div class="section-header">
+                    <h3>标签</h3>
+                </div>
+                <div class="tags-cloud" id="tags-cloud">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 顶部工具栏 -->
+            <header class="toolbar">
+                <div class="search-box">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="search-input" placeholder="搜索文献标题、作者、关键词...">
+                </div>
+                <div class="toolbar-actions">
+                    <select id="sort-select" class="sort-select">
+                        <option value="date-desc">最近添加</option>
+                        <option value="date-asc">最早添加</option>
+                        <option value="title-asc">标题 A-Z</option>
+                        <option value="title-desc">标题 Z-A</option>
+                        <option value="year-desc">年份 新→旧</option>
+                        <option value="year-asc">年份 旧→新</option>
+                    </select>
+                    <button class="btn btn-secondary" id="import-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        导入
+                    </button>
+                    <button class="btn btn-secondary" id="export-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        导出
+                    </button>
+                    <button class="btn btn-primary" id="add-reference-btn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        添加文献
+                    </button>
+                </div>
+            </header>
+
+            <!-- 文献列表 -->
+            <div class="references-container">
+                <div class="view-header">
+                    <h2 id="view-title">全部文献</h2>
+                    <span class="results-info" id="results-info"></span>
+                </div>
+                <div class="references-list" id="references-list">
+                    <!-- 动态生成 -->
+                </div>
+                <div class="empty-state" id="empty-state">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                    <h3>暂无文献</h3>
+                    <p>点击"添加文献"开始管理你的参考文献</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- 详情面板 -->
+        <aside class="detail-panel" id="detail-panel">
+            <div class="detail-header">
+                <h3>文献详情</h3>
+                <button class="icon-btn" id="close-detail">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="detail-content" id="detail-content">
+                <!-- 动态生成 -->
+            </div>
+        </aside>
+    </div>
+
+    <!-- 添加/编辑文献模态框 -->
+    <div class="modal" id="reference-modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2 id="modal-title">添加文献</h2>
+                <button class="icon-btn modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="reference-form">
+                <div class="form-tabs">
+                    <button type="button" class="form-tab active" data-tab="basic">基本信息</button>
+                    <button type="button" class="form-tab" data-tab="details">详细信息</button>
+                    <button type="button" class="form-tab" data-tab="notes">笔记</button>
+                </div>
+                
+                <div class="form-tab-content active" data-tab="basic">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ref-type">文献类型 *</label>
+                            <select id="ref-type" required>
+                                <option value="article">期刊论文</option>
+                                <option value="book">书籍</option>
+                                <option value="inproceedings">会议论文</option>
+                                <option value="thesis">学位论文</option>
+                                <option value="techreport">技术报告</option>
+                                <option value="misc">其他</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ref-year">年份 *</label>
+                            <input type="number" id="ref-year" min="1900" max="2100" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-title">标题 *</label>
+                        <input type="text" id="ref-title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-authors">作者 * <small>(多个作者用分号分隔)</small></label>
+                        <input type="text" id="ref-authors" placeholder="张三; 李四; Wang, Wei" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ref-journal">期刊/出版社</label>
+                            <input type="text" id="ref-journal">
+                        </div>
+                        <div class="form-group">
+                            <label for="ref-category">分类</label>
+                            <select id="ref-category">
+                                <option value="">-- 选择分类 --</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-tab-content" data-tab="details">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ref-volume">卷</label>
+                            <input type="text" id="ref-volume">
+                        </div>
+                        <div class="form-group">
+                            <label for="ref-number">期</label>
+                            <input type="text" id="ref-number">
+                        </div>
+                        <div class="form-group">
+                            <label for="ref-pages">页码</label>
+                            <input type="text" id="ref-pages" placeholder="1-20">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-doi">DOI</label>
+                        <input type="text" id="ref-doi" placeholder="10.xxxx/xxxxx">
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-url">URL</label>
+                        <input type="url" id="ref-url">
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-abstract">摘要</label>
+                        <textarea id="ref-abstract" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-keywords">关键词 <small>(用逗号分隔)</small></label>
+                        <input type="text" id="ref-keywords" placeholder="机器学习, 深度学习, 神经网络">
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-tags">标签 <small>(用逗号分隔)</small></label>
+                        <div class="tags-input-container">
+                            <input type="text" id="ref-tags" placeholder="输入标签后按回车">
+                            <div class="tags-list" id="tags-input-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-tab-content" data-tab="notes">
+                    <div class="form-group">
+                        <label for="ref-notes">阅读笔记</label>
+                        <textarea id="ref-notes" rows="10" placeholder="记录你的阅读心得、重要观点、问题等..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="ref-progress">阅读进度</label>
+                        <div class="progress-input">
+                            <input type="range" id="ref-progress" min="0" max="100" value="0">
+                            <span id="progress-value">0%</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>阅读状态</label>
+                        <div class="status-options">
+                            <label class="status-option">
+                                <input type="radio" name="reading-status" value="unread" checked>
+                                <span>未读</span>
+                            </label>
+                            <label class="status-option">
+                                <input type="radio" name="reading-status" value="reading">
+                                <span>正在阅读</span>
+                            </label>
+                            <label class="status-option">
+                                <input type="radio" name="reading-status" value="completed">
+                                <span>已完成</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary modal-close">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 添加分类模态框 -->
+    <div class="modal" id="category-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>添加分类</h2>
+                <button class="icon-btn modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <form id="category-form">
+                <div class="form-group">
+                    <label for="category-name">分类名称 *</label>
+                    <input type="text" id="category-name" required>
+                </div>
+                <div class="form-group">
+                    <label for="category-color">颜色</label>
+                    <div class="color-picker">
+                        <input type="color" id="category-color" value="#6366f1">
+                        <input type="text" id="category-color-text" value="#6366f1">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary modal-close">取消</button>
+                    <button type="submit" class="btn btn-primary">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 导入模态框 -->
+    <div class="modal" id="import-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>导入文献</h2>
+                <button class="icon-btn modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="import-options">
+                <div class="import-option">
+                    <h4>从BibTeX文件导入</h4>
+                    <p>支持 .bib 格式文件</p>
+                    <input type="file" id="bibtex-file" accept=".bib" style="display:none">
+                    <button class="btn btn-secondary" id="select-bibtex-file">选择文件</button>
+                </div>
+                <div class="import-divider">或</div>
+                <div class="import-option">
+                    <h4>粘贴BibTeX内容</h4>
+                    <textarea id="bibtex-paste" rows="8" placeholder="粘贴BibTeX格式的文献信息..."></textarea>
+                    <button class="btn btn-primary" id="import-bibtex-text">导入</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导出模态框 -->
+    <div class="modal" id="export-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>导出文献</h2>
+                <button class="icon-btn modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="export-options">
+                <div class="form-group">
+                    <label>导出范围</label>
+                    <div class="radio-group">
+                        <label>
+                            <input type="radio" name="export-scope" value="all" checked>
+                            全部文献
+                        </label>
+                        <label>
+                            <input type="radio" name="export-scope" value="selected">
+                            仅已选择的文献
+                        </label>
+                        <label>
+                            <input type="radio" name="export-scope" value="current">
+                            当前视图的文献
+                        </label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>导出格式</label>
+                    <div class="export-format-btns">
+                        <button class="btn btn-secondary" data-format="bibtex">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            BibTeX (.bib)
+                        </button>
+                        <button class="btn btn-secondary" data-format="json">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                            JSON (.json)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引用格式模态框 -->
+    <div class="modal" id="citation-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>生成引用</h2>
+                <button class="icon-btn modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+            <div class="citation-content">
+                <div class="form-group">
+                    <label>引用格式</label>
+                    <select id="citation-style">
+                        <option value="apa">APA (第7版)</option>
+                        <option value="mla">MLA (第9版)</option>
+                        <option value="chicago">Chicago</option>
+                        <option value="harvard">Harvard</option>
+                        <option value="ieee">IEEE</option>
+                        <option value="gb">GB/T 7714-2015</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>引用文本</label>
+                    <div class="citation-output" id="citation-output"></div>
+                </div>
+                <button class="btn btn-primary" id="copy-citation">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    复制引用
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
