@@ -1,94 +1,90 @@
-# 📚 RefManager - 文献管理助手
+# DocManager 文献管理助手
 
-一个简洁高效的在线文献管理工具，帮助研究人员、学生轻松管理学术文献。
+一个简洁高效的本地文献管理桌面应用，基于 Electron 构建，支持 Windows x64。
 
-![RefManager](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20x64-lightgrey.svg)
 
 ## ✨ 功能特性
 
-### 📖 文献管理
-- **多类型支持** - 期刊论文、书籍、会议论文、学位论文、技术报告等
-- **分类管理** - 自定义分类，支持颜色标识，快速归档整理
-- **标签系统** - 灵活添加标签，标签云可视化展示
-
-### 🔍 搜索与筛选
-- **全文搜索** - 支持标题、作者、关键词、摘要搜索
-- **多维排序** - 按添加时间、标题、年份排序
-- **快速筛选** - 一键查看正在阅读、已完成、收藏的文献
-
-### 📝 阅读追踪
-- **阅读笔记** - 为每篇文献记录阅读心得和重要观点
-- **进度追踪** - 可视化进度条，掌握阅读进度
-- **状态管理** - 未读 / 阅读中 / 已完成 状态切换
-
-### 📤 导入导出
-- **BibTeX 导入** - 支持 .bib 文件导入或直接粘贴
-- **多格式导出** - 支持 BibTeX、JSON 格式导出
-- **批量操作** - 可选择导出全部、已选择或当前视图的文献
-
-### 📋 引用生成
-一键生成多种主流引用格式：
-- APA (第7版)
-- MLA (第9版)
-- Chicago
-- Harvard
-- IEEE
-- GB/T 7714-2015（国标）
+- 📚 **文献管理** - 添加、编辑、删除、搜索文献
+- 🏷️ **分类与标签** - 灵活的分类系统和标签云
+- 📖 **阅读进度** - 跟踪阅读状态和进度
+- ⭐ **收藏功能** - 快速收藏重要文献
+- 📝 **引用生成** - 支持 APA、MLA、Chicago、Harvard、IEEE、GB/T 7714 等格式
+- 📥 **多格式导入** - 支持 BibTeX、RIS、EndNote XML、JSON、PDF、Word
+- 📤 **导出功能** - 导出为 BibTeX 或 JSON 格式
+- 💾 **本地存储** - 数据安全存储在本地
 
 ## 🚀 快速开始
 
-### 在线使用
-直接访问部署后的 GitHub Pages 链接即可使用。
+### 环境要求
 
-### 本地使用
-1. 下载项目文件
-2. 用浏览器打开 `index.html`
-3. 开始管理你的文献！
+- Node.js 18+ 
+- npm 或 yarn
+
+### 安装依赖
+
+```bash
+npm install
+```
+
+### 开发模式运行
+
+```bash
+npm start
+```
+
+### 打包构建
+
+```bash
+# 打包为 Windows x64 安装包
+npm run build
+
+# 仅生成未打包的目录（用于测试）
+npm run build:dir
+```
+
+打包后的安装程序位于 `dist/` 目录。
 
 ## 📁 项目结构
 
 ```
-ref-manager/
-├── index.html    # 主页面
-├── styles.css    # 样式文件
-├── app.js        # 应用逻辑
-└── README.md     # 说明文档
+docmanager/
+├── main.js          # Electron 主进程
+├── preload.js       # 预加载脚本（安全 API 桥接）
+├── index.html       # 主界面
+├── styles.css       # 样式文件
+├── app.js           # 应用逻辑
+├── package.json     # 项目配置
+└── README.md        # 项目说明
 ```
 
 ## 💾 数据存储
 
-所有数据保存在浏览器的 LocalStorage 中：
-- ✅ 刷新页面数据不丢失
-- ✅ 无需注册登录
-- ✅ 数据完全本地化，保护隐私
-- ⚠️ 清除浏览器数据或换设备会导致数据丢失（建议定期导出备份）
+应用数据存储在用户目录下：
 
-## 🛠️ 技术栈
+- **Windows**: `%APPDATA%\refmanager\RefManager\`
+  - `references.json` - 文献数据
+  - `categories.json` - 分类数据
 
-- **HTML5** - 语义化结构
-- **CSS3** - 现代化 UI 设计，响应式布局
-- **Vanilla JavaScript** - 原生 JS，无框架依赖，轻量高效
+## 🔧 技术栈
 
-## 📸 界面预览
+- **Electron** - 跨平台桌面应用框架
+- **electron-builder** - 应用打包工具
+- **原生 HTML/CSS/JS** - 轻量级前端
 
-### 主界面
-- 左侧：导航栏、分类管理、标签云
-- 中间：文献列表，支持搜索和排序
-- 右侧：文献详情面板
+## 📝 支持的导入格式
 
-### 功能亮点
-- 🎨 清爽现代的 UI 设计
-- 📱 响应式布局，适配各种屏幕
-- ⚡ 纯前端实现，加载迅速
+| 格式 | 扩展名 | 说明 |
+|------|--------|------|
+| BibTeX | .bib | 学术文献标准格式 |
+| RIS | .ris | 通用文献交换格式 |
+| EndNote XML | .xml | EndNote 导出格式 |
+| JSON | .json | 通用数据格式 |
+| PDF | .pdf | 自动提取文件名 |
+| Word | .doc/.docx | 自动提取文件名 |
 
-## 📄 License
+## 📜 License
 
-MIT License - 自由使用、修改和分发
-
-## 🤝 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
----
-
-**如果觉得有用，请给个 ⭐ Star 支持一下！**
+MIT License
