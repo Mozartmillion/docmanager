@@ -37,34 +37,53 @@ const state = {
 // 初始化
 // ============================================
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadData();
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadData();
     initEventListeners();
     render();
 });
 
-function loadData() {
-    // 加载文献数据
-    const savedRefs = localStorage.getItem(STORAGE_KEYS.REFERENCES);
-    state.references = savedRefs ? JSON.parse(savedRefs) : [];
-    
-    // 加载分类数据
-    const savedCategories = localStorage.getItem(STORAGE_KEYS.CATEGORIES);
-    state.categories = savedCategories ? JSON.parse(savedCategories) : [
-        { id: 'default-1', name: '机器学习', color: '#6366f1' },
-        { id: 'default-2', name: '计算机视觉', color: '#22c55e' },
-        { id: 'default-3', name: '自然语言处理', color: '#f59e0b' }
-    ];
-    
-    saveCategories();
+async function loadData() {
+    try {
+        // 使用 Electron IPC 加载文献数据
+        const savedRefs = await window.electronAPI.loadData('references');
+        state.references = savedRefs || [];
+        
+        // 加载分类数据
+        const savedCategories = await window.electronAPI.loadData('categories');
+        state.categories = savedCategories || [
+            { id: 'default-1', name: '机器学习', color: '#6366f1' },
+            { id: 'default-2', name: '计算机视觉', color: '#22c55e' },
+            { id: 'default-3', name: '自然语言处理', color: '#f59e0b' }
+        ];
+        
+        saveCategories();
+    } catch (error) {
+        console.error('加载数据失败:', error);
+        state.references = [];
+        state.categories = [
+            { id: 'default-1', name: '机器学习', color: '#6366f1' },
+            { id: 'default-2', name: '计算机视觉', color: '#22c55e' },
+            { id: 'default-3', name: '自然语言处理', color: '#f59e0b' }
+        ];
+    }
 }
 
-function saveReferences() {
-    localStorage.setItem(STORAGE_KEYS.REFERENCES, JSON.stringify(state.references));
+async function saveReferences() {
+    try {
+        await window.electronAPI.saveData('references', state.references);
+    } catch (error) {
+        console.error('保存文献失败:', error);
+        showToast('保存失败，请重试', 'error');
+    }
 }
 
-function saveCategories() {
-    localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(state.categories));
+async function saveCategories() {
+    try {
+        await window.electronAPI.saveData('categories', state.categories);
+    } catch (error) {
+        console.error('保存分类失败:', error);
+    }
 }
 
 // ============================================
@@ -169,9 +188,26 @@ function initEventListeners() {
         document.getElementById('category-color').value = e.target.value;
     });
 
-    // 新的导入文件选择
-    document.getElementById('select-import-file').addEventListener('click', () => {
-        document.getElementById('import-file').click();
+    // 新的导入文件选择 - 使用 Electron 原生对话框
+    document.getElementById('select-import-file').addEventListener('click', async () => {
+        try {
+            const result = await window.electronAPI.openFiles([
+                { name: 'BibTeX 文件', extensions: ['bib'] },
+                { name: 'RIS 文件', extensions: ['ris'] },
+                { name: 'EndNote XML', extensions: ['xml'] },
+                { name: 'JSON 文件', extensions: ['json'] },
+                { name: 'PDF 文件', extensions: ['pdf'] },
+                { name: 'Word 文档', extensions: ['doc', 'docx'] },
+                { name: '所有文件', extensions: ['*'] }
+            ]);
+            
+            if (result.success && result.files && result.files.length > 0) {
+                processImportFilesFromElectron(result.files);
+            }
+        } catch (error) {
+            console.error('打开文件失败:', error);
+            showToast('打开文件失败', 'error');
+        }
     });
 
     document.getElementById('import-file').addEventListener('change', handleFileSelect);
@@ -1104,6 +1140,145 @@ function formatAuthorsGB(authors) {
 // 待导入的文件列表
 let pendingImportFiles = [];
 
+// 处理 Electron 导入的文件
+async function processImportFilesFromElectron(files) {
+    let totalImported = 0;
+    let errors = [];
+    const fileListContainer = document.getElementById('import-file-list');
+
+    // 显示文件列表
+    fileListContainer.innerHTML = files.map((file, index) => `
+        <div class="import-file-item" data-index="${index}">
+            <span class="file-name">${file.name}</span>
+            <span class="file-size">${formatFileSize(file.size)}</span>
+        </div>
+    `).join('');
+
+    for (const file of files) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        
+        try {
+            let imported = 0;
+
+            switch (ext) {
+                case 'bib':
+                    imported = importBibTeX(file.content, false);
+                    break;
+                case 'ris':
+                    imported = importRIS(file.content, false);
+                    break;
+                case 'xml':
+                    imported = importEndNoteXML(file.content, false);
+                    break;
+                case 'json':
+                    imported = importJSON(file.content, false);
+                    break;
+                case 'pdf':
+                    imported = importPDFFromPath(file.name, file.path, false);
+                    break;
+                case 'doc':
+                case 'docx':
+                    imported = importDOCFromPath(file.name, file.path, false);
+                    break;
+                default:
+                    errors.push(`不支持的文件格式: ${file.name}`);
+            }
+            
+            totalImported += imported;
+        } catch (e) {
+            errors.push(`导入失败: ${file.name} - ${e.message}`);
+            console.error(e);
+        }
+    }
+
+    await saveReferences();
+    closeAllModals();
+    render();
+
+    if (totalImported > 0) {
+        showToast(`成功导入 ${totalImported} 篇文献`, 'success');
+    }
+    if (errors.length > 0) {
+        showToast(errors.join('\n'), 'error');
+    }
+}
+
+// 从路径导入 PDF
+function importPDFFromPath(fileName, filePath, showMessage = true) {
+    const baseName = fileName.replace('.pdf', '');
+    
+    const ref = {
+        id: generateId(),
+        type: 'article',
+        title: baseName,
+        authors: '',
+        year: new Date().getFullYear(),
+        journal: '',
+        volume: '',
+        number: '',
+        pages: '',
+        doi: '',
+        url: '',
+        abstract: '',
+        keywords: '',
+        tags: [],
+        notes: `从 PDF 文件导入: ${fileName}\n文件路径: ${filePath}\n\n请手动补充文献详细信息。`,
+        progress: 0,
+        readingStatus: 'unread',
+        favorite: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sourceFile: fileName,
+        localPath: filePath
+    };
+
+    state.references.push(ref);
+
+    if (showMessage) {
+        showToast('PDF 文献已导入，请手动补充详细信息', 'info');
+    }
+
+    return 1;
+}
+
+// 从路径导入 DOC/DOCX
+function importDOCFromPath(fileName, filePath, showMessage = true) {
+    const baseName = fileName.replace(/\.(doc|docx)$/i, '');
+    
+    const ref = {
+        id: generateId(),
+        type: 'misc',
+        title: baseName,
+        authors: '',
+        year: new Date().getFullYear(),
+        journal: '',
+        volume: '',
+        number: '',
+        pages: '',
+        doi: '',
+        url: '',
+        abstract: '',
+        keywords: '',
+        tags: [],
+        notes: `从 Word 文档导入: ${fileName}\n文件路径: ${filePath}\n\n请手动补充文献详细信息。`,
+        progress: 0,
+        readingStatus: 'unread',
+        favorite: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        sourceFile: fileName,
+        localPath: filePath
+    };
+
+    state.references.push(ref);
+
+    if (showMessage) {
+        showToast('Word 文档已导入，请手动补充详细信息', 'info');
+    }
+
+    return 1;
+}
+
 // 处理文件选择
 function handleFileSelect(e) {
     const files = Array.from(e.target.files);
@@ -1631,7 +1806,7 @@ function parseBibTeX(text) {
     return entries;
 }
 
-function exportReferences(format) {
+async function exportReferences(format) {
     const scope = document.querySelector('input[name="export-scope"]:checked').value;
     let refs = [];
 
@@ -1648,21 +1823,30 @@ function exportReferences(format) {
         return;
     }
 
-    let content, filename, mimeType;
+    let content, defaultName, filters;
 
     if (format === 'bibtex') {
         content = refs.map(ref => generateBibTeXEntry(ref)).join('\n\n');
-        filename = 'references.bib';
-        mimeType = 'application/x-bibtex';
+        defaultName = 'references.bib';
+        filters = [{ name: 'BibTeX', extensions: ['bib'] }];
     } else {
         content = JSON.stringify(refs, null, 2);
-        filename = 'references.json';
-        mimeType = 'application/json';
+        defaultName = 'references.json';
+        filters = [{ name: 'JSON', extensions: ['json'] }];
     }
 
-    downloadFile(content, filename, mimeType);
-    closeAllModals();
-    showToast(`成功导出 ${refs.length} 篇文献`, 'success');
+    try {
+        const result = await window.electronAPI.saveFile(content, defaultName, filters);
+        if (result.success) {
+            closeAllModals();
+            showToast(`成功导出 ${refs.length} 篇文献`, 'success');
+        } else if (result.error) {
+            showToast('导出失败: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('导出失败:', error);
+        showToast('导出失败', 'error');
+    }
 }
 
 function generateBibTeXEntry(ref) {
