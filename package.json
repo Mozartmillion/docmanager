@@ -1,7 +1,7 @@
 {
-  "name": "refmanager",
+  "name": "docmanager",
   "version": "1.0.0",
-  "description": "文献管理助手 - 本地桌面版",
+  "description": "DocManager 文献管理助手 - 本地桌面版",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -15,8 +15,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.refmanager.app",
-    "productName": "RefManager 文献管理助手",
+    "appId": "com.docmanager.app",
+    "productName": "DocManager",
     "directories": {
       "output": "dist"
     },
@@ -25,16 +25,27 @@
         {
           "target": "nsis",
           "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
         }
       ],
       "icon": "assets/icon.ico"
+    },
+    "portable": {
+      "artifactName": "DocManager-Portable-${version}.exe"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "RefManager"
+      "shortcutName": "DocManager"
     },
     "files": [
       "**/*",
